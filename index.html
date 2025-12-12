@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Whack-a-Cute 🐾 (Palu — Preview)</title>
+<style>
+:root { --bg1:#a78bfa; --bg2:#4c1d95; --accent:#ffcb3b; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body { font-family:"Poppins",sans-serif; background:radial-gradient(circle at top,var(--bg1),var(--bg2)); color:#fff;height:100vh;overflow:hidden; display:flex;justify-content:center;align-items:center; position:relative; }
+body.hide-native-cursor { cursor: none; }
+
+.page { position:absolute;top:0;left:100%; width:100%;height:100%; display:flex;justify-content:center;align-items:center; transition:all .6s ease; }
+.page.active {left:0;}
+.page.prev {left:-100%;}
+.card { background:rgba(255,255,255,0.15); backdrop-filter:blur(10px); padding:22px;border-radius:16px; box-shadow:0 8px 25px rgba(0,0,0,0.4); text-align:center;width:min(94%,560px); }
+button { background:var(--accent);border:none;color:#222; font-weight:bold;padding:10px 18px;border-radius:10px; margin-top:12px;cursor:pointer;transition:transform .15s; }
+button:hover{transform:scale(1.04);}
+label{display:block;text-align:left;margin:8px 0;}
+input,select{width:100%;padding:8px;border:none;border-radius:8px;margin-top:6px;font-size:14px;}
+header { display:flex;justify-content:space-between;align-items:center; width:90%;max-width:820px;margin-bottom:10px; }
+.hud span{font-weight:bold;}
+#grid{display:grid;gap:12px;justify-content:center;margin-top:14px;padding:8px;}
+
+.hole { width:100px;height:100px;background:#1e1b4b; border-radius:50%;overflow:hidden;position:relative; box-shadow:inset 0 -8px 15px rgba(0,0,0,0.6); display:flex;align-items:flex-end;justify-content:center; }
+.animal { width:80px;height:80px; position:relative;bottom:-100px; background-size:contain;background-repeat:no-repeat; transition:bottom .25s ease;cursor:default; }
+.pop{bottom:8px;}
+
+.hitFX { position:absolute;top:30%;left:50%; transform:translate(-50%,-50%); color:#fff;font-weight:bold;text-shadow:0 0 10px #ffcb3b; animation:popText .5s ease forwards; pointer-events:none; }
+@keyframes popText { 0%{transform:translate(-50%,-50%) scale(0.8);opacity:1;} 100%{transform:translate(-50%,-120%) scale(1.4);opacity:0;} }
+
+#page-result h1{font-size:2em;margin-bottom:10px;} #page-result p{margin:10px 0;}
+.fadeIn {animation:fadeIn .6s;} @keyframes fadeIn {from{opacity:0;}to{opacity:1;}}
+
+.hammer-cursor { position:fixed; width:72px;height:72px; pointer-events:none; background-size:contain;background-repeat:no-repeat;background-position:center; transform:translate(-30px,-10px) rotate(-10deg); transition:transform .06s linear; z-index:9999; display:none; will-change:transform,left,top; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.45)); }
+.hammer-cursor.hit { transform:translate(-30px,-10px) rotate(10deg) scale(0.92); transition:transform .08s ease; }
+
+/* preview UI */
+.hammer-preview-wrap { display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap; }
+.hammer-thumbnails { display:flex;gap:10px;align-items:center; }
+.thumb { width:56px;height:56px;border-radius:8px;border:2px solid rgba(255,255,255,0.12); background-size:cover;background-position:center; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+.thumb.selected { transform:scale(1.06); box-shadow:0 8px 18px rgba(0,0,0,0.45); border-color:var(--accent); }
+.hammer-preview-large { width:96px;height:96px;border-radius:12px;border:2px solid rgba(255,255,255,0.08); background-size:contain;background-repeat:no-repeat;background-position:center; display:flex;align-items:center;justify-content:center; }
+
+/* responsive */
+@media (max-width:480px){
+  .hole{width:78px;height:78px;} .animal{width:62px;height:62px;} .hammer-cursor{width:58px;height:58px;transform:translate(-24px,-8px);} .hammer-preview-large{width:72px;height:72px;}
+}
+</style>
+</head>
+<body class="fadeIn">
+
+<!-- SETTINGS -->
+<div id="page-settings" class="page active">
+  <div class="card">
+    <h1>🐾 Whack-a-Cute — Pengaturan</h1>
+    <label>Durasi Permainan (detik)
+      <input type="number" id="duration" value="30" min="10" max="90">
+    </label>
+
+    <!-- REVISI: Kecepatan sebagai dropdown dengan label -->
+    <label>Kecepatan Hewan (ms)
+      <select id="speed">
+        <option value="800">800 — sangat cepat</option>
+        <option value="1000">1000 — cepat</option>
+        <option value="1200" selected>1200 — sedang</option>
+        <option value="1500">1500 — lambat</option>
+        <option value="2000">2000 — sangat lambat</option>
+      </select>
+    </label>
+
+    <label>Jumlah Lubang
+      <select id="holes">
+        <option value="6">6 (2x3)</option>
+        <option value="9" selected>9 (3x3)</option>
+        <option value="12">12 (3x4)</option>
+      </select>
+    </label>
+
+    <label>Pilih Jenis Palu (kursor)</label>
+    <select id="hammerSelect" style="width:100%;padding:8px;border-radius:8px;border:none;">
+      <option value="hammer1" selected>Palu 1</option>
+      <option value="hammer2">Palu 2</option>
+      <option value="hammer3">Palu 3</option>
+    </select>
+
+    <!-- preview area -->
+    <div class="hammer-preview-wrap">
+      <div>
+        <div style="font-size:13px;text-align:left;margin-bottom:6px;opacity:0.9;">Preview Palu</div>
+        <div id="hammerPreviewLarge" class="hammer-preview-large" aria-hidden="true"></div>
+      </div>
+
+      <div style="flex:1">
+        <div style="font-size:13px;text-align:left;margin-bottom:6px;opacity:0.9;">Thumbnail Pilihan</div>
+        <div class="hammer-thumbnails">
+          <div id="thumb1" class="thumb selected" title="Palu 1"></div>
+          <div id="thumb2" class="thumb" title="Palu 2"></div>
+          <div id="thumb3" class="thumb" title="Palu 3"></div>
+        </div>
+      </div>
+    </div>
+
+    <button id="startGameBtn">Mulai Game</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="page-game" class="page">
+  <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+    <header class="hud" style="max-width:820px;">
+      <span>Skor: <span id="score">0</span></span>
+      <span>Sisa: <span id="timer">0</span>s</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="pauseBtn">Pause</button>
+        <button id="backBtn" style="background:rgba(255,255,255,0.12);color:#fff;">Keluar</button>
+      </div>
+    </header>
+    <div id="grid" style="max-width:820px;"></div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div id="page-result" class="page">
+  <div class="card">
+    <h1>🎉 Permainan Selesai 🎉</h1>
+    <p>Skor kamu: <span id="finalScore" style="color:var(--accent);font-size:1.4em;">0</span></p>
+    <p id="message">Selamat! Kamu luar biasa!</p>
+    <button id="playAgainBtn">Main Lagi</button>
+  </div>
+</div>
+
+<!-- hammer cursor -->
+<div id="hammerCursor" class="hammer-cursor" aria-hidden="true"></div>
+
+<!-- audio -->
+<audio id="bgm" loop src="https://cdn.pixabay.com/download/audio/2022/03/01/audio_7e9db3a2d8.mp3?filename=fantasy-game-loop-110488.mp3"></audio>
+<audio id="hitSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<script>
+/* ---------- PALU (langsung di HTML sesuai request) ---------- */
+const hammerMap = {
+  hammer1: "https://i.imgur.com/xuog1r3.png",
+  hammer2: "https://i.imgur.com/zEY2R7a.png",
+  hammer3: "https://i.imgur.com/qGfmpjH.png"
+};
+
+/* ---------- other resources ---------- */
+const animals=[
+  "https://cdn-icons-png.flaticon.com/512/616/616408.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616554.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616490.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616436.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616430.png"
+];
+
+const pages = {
+  settings: document.getElementById("page-settings"),
+  game: document.getElementById("page-game"),
+  result: document.getElementById("page-result")
+};
+const grid = document.getElementById("grid");
+const bgm = document.getElementById("bgm");
+const hitSound = document.getElementById("hitSound");
+const pauseBtn = document.getElementById("pauseBtn");
+const backBtn = document.getElementById("backBtn");
+const scoreEl = document.getElementById("score");
+const timerEl = document.getElementById("timer");
+const finalScoreEl = document.getElementById("finalScore");
+const msgEl = document.getElementById("message");
+const hammerCursor = document.getElementById("hammerCursor");
+
+let score=0, timeLeft=30, interval=null, moleTimer=null, paused=false, settings={};
+let currentHammer='hammer1';
+
+/* ------------------ FIX: showPage defined so navigation works ------------------ */
+function showPage(pageName){
+  for(const key in pages){
+    const p = pages[key];
+    p.classList.remove('active','prev');
+    if(p === pages[pageName]) p.classList.add('active');
+    else if(pages[pageName] === pages.result && key === 'game') p.classList.add('prev');
+  }
+}
+
+/* initialize preview thumbnails and large preview */
+function initPreview(){
+  const thumb1 = document.getElementById('thumb1');
+  const thumb2 = document.getElementById('thumb2');
+  const thumb3 = document.getElementById('thumb3');
+  const large = document.getElementById('hammerPreviewLarge');
+  const select = document.getElementById('hammerSelect');
+
+  // set images
+  thumb1.style.backgroundImage = `url(${hammerMap.hammer1})`;
+  thumb2.style.backgroundImage = `url(${hammerMap.hammer2})`;
+  thumb3.style.backgroundImage = `url(${hammerMap.hammer3})`;
+  large.style.backgroundImage = `url(${hammerMap.hammer1})`;
+
+  function setSelected(n){
+    currentHammer = ['hammer1','hammer2','hammer3'][n-1];
+    // update select value
+    select.value = currentHammer;
+    // update thumbnail classes
+    [thumb1,thumb2,thumb3].forEach((t,i)=> t.classList.toggle('selected', i===n-1));
+    // update large preview & hammer cursor image
+    large.style.backgroundImage = `url(${hammerMap[currentHammer]})`;
+    hammerCursor.style.backgroundImage = `url(${hammerMap[currentHammer]})`;
+  }
+
+  // click handlers on thumbnails
+  thumb1.addEventListener('click', ()=> setSelected(1));
+  thumb2.addEventListener('click', ()=> setSelected(2));
+  thumb3.addEventListener('click', ()=> setSelected(3));
+
+  // when dropdown changes
+  select.addEventListener('change',(e)=>{
+    const idx = e.target.value === 'hammer1' ? 1 : e.target.value === 'hammer2' ? 2 : 3;
+    setSelected(idx);
+  });
+
+  // set initial
+  setSelected(1);
+}
+
+/* ---------- grid & game logic ---------- */
+function buildGrid(){
+  grid.innerHTML='';
+  grid.style.gridTemplateColumns = settings.holes===12 ? 'repeat(4,1fr)' : 'repeat(3,1fr)';
+  for(let i=0;i<settings.holes;i++){
+    const hole = document.createElement('div');
+    hole.className = 'hole';
+    const animal = document.createElement('div');
+    animal.className = 'animal';
+    animal.style.backgroundImage = `url(${animals[Math.floor(Math.random()*animals.length)]})`;
+    hole.appendChild(animal);
+    grid.appendChild(hole);
+
+    animal.addEventListener('click',()=>{
+      if(!animal.classList.contains('pop') || paused) return;
+      animal.classList.remove('pop');
+      score++; scoreEl.textContent = score;
+      hitSound.currentTime=0; hitSound.play();
+      const fx = document.createElement('div');
+      fx.className='hitFX'; fx.textContent='+1';
+      hole.appendChild(fx); setTimeout(()=>fx.remove(),500);
+      hammerCursor.classList.add('hit'); setTimeout(()=>hammerCursor.classList.remove('hit'),120);
+    });
+  }
+}
+
+function randomHole(){
+  const a = document.querySelectorAll('.animal');
+  return a[Math.floor(Math.random()*a.length)];
+}
+function showAnimal(){
+  if(paused) return;
+  const a = randomHole();
+  if(!a) return;
+  a.classList.add('pop');
+  setTimeout(()=>a.classList.remove('pop'), Math.max(120, settings.speed * 0.8));
+}
+
+function startGame(){
+  settings = {
+    duration: parseInt(document.getElementById("duration").value,10),
+    // parse speed from dropdown (string) into number
+    speed: parseInt(document.getElementById("speed").value,10),
+    holes: parseInt(document.getElementById("holes").value,10)
+  };
+  score=0; scoreEl.textContent=0;
+  timeLeft=settings.duration; timerEl.textContent=timeLeft;
+  buildGrid();
+  showPage('game');
+
+  document.body.classList.add('hide-native-cursor');
+  hammerCursor.style.display='block';
+  hammerCursor.style.backgroundImage = `url(${hammerMap[currentHammer]})`;
+
+  bgm.volume=0.4; bgm.currentTime=0; bgm.play();
+  clearIntervals();
+  interval = setInterval(()=>{
+    if(!paused){ timeLeft--; timerEl.textContent=timeLeft; }
+    if(timeLeft<=0) endGame();
+  },1000);
+  moleTimer = setInterval(showAnimal, Math.max(200, settings.speed));
+}
+
+function endGame(){
+  clearIntervals();
+  bgm.pause();
+  finalScoreEl.textContent = score;
+  msgEl.textContent =
+    score < 5 ? "Ayo coba lagi!" :
+    score < 15 ? "Keren! Refleksmu cepat!" :
+    "Luar biasa! Kamu master Whack-a-Cute!";
+  hammerCursor.style.display='none';
+  document.body.classList.remove('hide-native-cursor');
+  showPage('result');
+}
+function clearIntervals(){ if(interval){clearInterval(interval);interval=null;} if(moleTimer){clearInterval(moleTimer);moleTimer=null;} }
+
+document.getElementById("startGameBtn").onclick = ()=>{
+  const sel = document.getElementById('hammerSelect').value;
+  if(sel) currentHammer = sel;
+  hammerCursor.style.backgroundImage = `url(${hammerMap[currentHammer]})`;
+  startGame();
+};
+
+pauseBtn.onclick = ()=>{
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Lanjut' : 'Pause';
+  if(paused) bgm.pause(); else bgm.play();
+  hammerCursor.style.display = paused ? 'none' : 'block';
+};
+
+backBtn.onclick = ()=>{
+  clearIntervals(); bgm.pause();
+  hammerCursor.style.display='none';
+  document.body.classList.remove('hide-native-cursor');
+  showPage('settings');
+};
+
+document.getElementById("playAgainBtn").onclick = ()=>{ bgm.pause(); showPage('settings'); };
+
+window.addEventListener('mousemove',(e)=>{
+  if(hammerCursor.style.display === 'none') return;
+  hammerCursor.style.left = e.clientX + 'px';
+  hammerCursor.style.top = e.clientY + 'px';
+});
+
+window.addEventListener('touchstart',(e)=>{ if(!e.touches || e.touches.length===0) return; const t = e.touches[0]; hammerCursor.style.left = t.clientX + 'px'; hammerCursor.style.top = t.clientY + 'px'; });
+window.addEventListener('touchend',(e)=>{ hammerCursor.classList.add('hit'); setTimeout(()=>hammerCursor.classList.remove('hit'),120); });
+
+/* init preview */
+initPreview();
+
+/* cleanup */
+window.addEventListener('beforeunload',()=>{ clearIntervals(); if(bgm) bgm.pause(); });
+</script>
+
+</body>
+</html>
